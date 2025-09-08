@@ -227,6 +227,43 @@ func (l *Logger) GetExtraFields(ctx context.Context) (map[string]any, bool) {
 	return pairs, true
 }
 
+// DetachContext creates a new background context with logging values copied from the original context.
+// Use this when starting goroutines that may outlive the original request context.
+func (l *Logger) DetachContext(ctx context.Context) context.Context {
+	newCtx := context.Background()
+	
+	// Copy request ID
+	if requestID, ok := l.GetRequestID(ctx); ok {
+		newCtx = l.SetRequestID(newCtx, requestID)
+	}
+	
+	// Copy user
+	if user, ok := l.GetUser(ctx); ok {
+		newCtx = l.SetUser(newCtx, user)
+	}
+	
+	// Copy user IP
+	if userIP, ok := l.GetUserIP(ctx); ok {
+		newCtx = l.SetUserIP(newCtx, userIP)
+	}
+	
+	// Copy extra fields
+	if extraFields, ok := l.GetExtraFields(ctx); ok {
+		for key, value := range extraFields {
+			newCtx = context.WithValue(newCtx, key, value)
+		}
+	}
+	
+	return newCtx
+}
+
+// WithTimeout creates a detached context with timeout that preserves logging values.
+// Use this for async operations that need both timeout and logging context.
+func (l *Logger) WithTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	detachedCtx := l.DetachContext(ctx)
+	return context.WithTimeout(detachedCtx, timeout)
+}
+
 func (l *Logger) combineAttributes(ctx context.Context, keysAndValues ...any) []any {
 	var combined []any
 

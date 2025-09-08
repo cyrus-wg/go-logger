@@ -12,6 +12,7 @@ A flexible, context-aware logging framework for Go, wrapping [Uber's Zap](https:
 - **Structured logging**: Key-value and formatted messages
 - **Request tracing**: Automatic request ID generation
 - **Real IP detection**: Extracts real client IP from headers
+- **Async context support**: Preserve logging context in goroutines
 
 ## Installation
 
@@ -106,6 +107,34 @@ type LoggerConfig struct {
 - `SetUser(ctx, user)`, `GetUser(ctx)`
 - `SetUserIP(ctx, ip)`, `GetUserIP(ctx)`
 - `GenerateRequestID()`
+
+### Async Context Support
+
+- `DetachContext(ctx)` - Create detached context for goroutines
+- `WithTimeout(ctx, timeout)` - Detached context with timeout
+
+## Async Context Example
+
+```go
+func handleRequest(w http.ResponseWriter, r *http.Request) {
+    ctx := r.Context()
+    ctx = logger.SetUser(ctx, "john.doe")
+    
+    logger.Info(ctx, "Starting request")
+    
+    // Start async task that outlives the request
+    go func() {
+        // Preserve logging context even after request ends
+        asyncCtx := logger.DetachContext(ctx)
+        
+        time.Sleep(5 * time.Second)
+        // This still has the request ID and user info
+        logger.Info(asyncCtx, "Async task completed")
+    }()
+    
+    w.Write([]byte("Request handled"))
+}
+```
 
 ### Middleware
 

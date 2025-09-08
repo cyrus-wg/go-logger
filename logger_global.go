@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 var loggerInstance *Logger
@@ -169,6 +170,14 @@ func GetUserIP(ctx context.Context) (string, bool) {
 
 func GetExtraFields(ctx context.Context) (map[string]any, bool) {
 	return loggerInstance.GetExtraFields(ctx)
+}
+
+func DetachContext(ctx context.Context) context.Context {
+	return loggerInstance.DetachContext(ctx)
+}
+
+func WithTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	return loggerInstance.WithTimeout(ctx, timeout)
 }
 
 func LoggerMiddleware(next http.Handler) http.Handler {
