@@ -231,29 +231,29 @@ func (l *Logger) GetExtraFields(ctx context.Context) (map[string]any, bool) {
 // Use this when starting goroutines that may outlive the original request context.
 func (l *Logger) DetachContext(ctx context.Context) context.Context {
 	newCtx := context.Background()
-	
+
 	// Copy request ID
 	if requestID, ok := l.GetRequestID(ctx); ok {
 		newCtx = l.SetRequestID(newCtx, requestID)
 	}
-	
+
 	// Copy user
 	if user, ok := l.GetUser(ctx); ok {
 		newCtx = l.SetUser(newCtx, user)
 	}
-	
+
 	// Copy user IP
 	if userIP, ok := l.GetUserIP(ctx); ok {
 		newCtx = l.SetUserIP(newCtx, userIP)
 	}
-	
+
 	// Copy extra fields
 	if extraFields, ok := l.GetExtraFields(ctx); ok {
 		for key, value := range extraFields {
 			newCtx = context.WithValue(newCtx, key, value)
 		}
 	}
-	
+
 	return newCtx
 }
 
@@ -298,11 +298,6 @@ func (l *Logger) LoggerMiddleware(next http.Handler) http.Handler {
 
 		userIP := getRealUserIP(r)
 		r = r.WithContext(l.SetUserIP(r.Context(), userIP))
-
-		method := r.Method
-		uri := r.RequestURI
-
-		l.Infow(r.Context(), "Entered LoggerMiddleware", "method", method, "uri", uri, "requestId", requestId)
 
 		next.ServeHTTP(w, r)
 
