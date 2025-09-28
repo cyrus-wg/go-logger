@@ -70,7 +70,7 @@ func RunGlobalLoggerDemo() {
 
 	port := 8080
 	logger.Infof(ctx, "Starting Development Mode Demo on :%d", port)
-	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), logger.LoggerMiddleware(mux)); err != nil {
+	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), logger.LoggerMiddleware(true, true)(mux)); err != nil {
 		logger.Fatal(ctx, "Server failed to start:", err)
 	}
 }
@@ -107,7 +107,7 @@ func RunInstanceLoggerDemo() {
 
 	port := 8080
 	loggerInstance.Infof(ctx, "Starting Instance Logger Demo on :%d", port)
-	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), loggerInstance.LoggerMiddleware(mux)); err != nil {
+	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), loggerInstance.LoggerMiddleware(true, true)(mux)); err != nil {
 		loggerInstance.Fatal(ctx, "Server failed to start:", err)
 	}
 }
