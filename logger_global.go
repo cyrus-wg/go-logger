@@ -180,6 +180,6 @@ func WithTimeout(ctx context.Context, timeout time.Duration) (context.Context, c
 	return loggerInstance.WithTimeout(ctx, timeout)
 }
 
-func LoggerMiddleware(next http.Handler) http.Handler {
-	return loggerInstance.LoggerMiddleware(next)
+func LoggerMiddleware(logRequestDetails bool, logCompleteTime bool) func(next http.Handler) http.Handler {
+	return loggerInstance.LoggerMiddleware(logRequestDetails, logCompleteTime)
 }

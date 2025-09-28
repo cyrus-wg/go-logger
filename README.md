@@ -30,11 +30,13 @@ import (
     "github.com/cyrus-wg/go-logger"
 )
 
+```go
 func main() {
-    logger.InitLogger(logger.LoggerConfig{Development: true})
+    logger.InitGlobalLogger(logger.LoggerConfig{Development: true})
     defer logger.Flush()
     logger.Info(context.Background(), "Hello from global logger!")
 }
+```
 ```
 
 ### Instance Logger (Advanced Usage)
@@ -52,7 +54,11 @@ func main() {
 }
 ```
 
-## HTTP Middleware Example
+## HTTP Middleware
+
+The logger provides configurable HTTP middleware for automatic request logging and tracing.
+
+### Basic Middleware Usage
 
 ```go
 import (
@@ -61,15 +67,90 @@ import (
 )
 
 func main() {
-    logger.InitLogger(logger.LoggerConfig{Development: true})
+    logger.InitGlobalLogger(logger.LoggerConfig{Development: true})
     defer logger.Flush()
+    
     mux := http.NewServeMux()
     mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
         logger.Info(r.Context(), "Request received")
         w.Write([]byte("Hello!"))
     })
-    http.ListenAndServe(":8080", logger.LoggerMiddleware(mux))
+    
+    // Basic middleware - logs completion time only
+    middleware := logger.LoggerMiddleware(false, true)
+    http.ListenAndServe(":8080", middleware(mux))
 }
+```
+
+### Advanced Request Logging
+
+```go
+// Enable detailed request logging + completion time
+middleware := logger.LoggerMiddleware(true, true)
+http.ListenAndServe(":8080", middleware(mux))
+```
+
+### Middleware Configuration Options
+
+The `LoggerMiddleware` function accepts two boolean parameters:
+
+- **`logRequestDetails bool`**: Logs comprehensive request information
+- **`logCompleteTime bool`**: Logs request completion with latency
+
+```go
+func LoggerMiddleware(logRequestDetails bool, logCompleteTime bool) func(http.Handler) http.Handler
+```
+
+#### Configuration Examples
+
+```go
+// Option 1: Minimal logging (latency only)
+logger.LoggerMiddleware(false, true)
+
+// Option 2: Full request details + latency
+logger.LoggerMiddleware(true, true)
+
+// Option 3: Request details only (no latency)
+logger.LoggerMiddleware(true, false)
+
+// Option 4: No automatic logging (manual logging only)
+logger.LoggerMiddleware(false, false)
+```
+
+### What Gets Logged
+
+When `logRequestDetails = true`, the middleware logs:
+
+#### Basic Request Info
+- HTTP method, URL, path, query parameters
+- Protocol version, host header
+
+#### Client Information  
+- Real client IP (with proxy header parsing)
+- User agent, referer
+- Remote address
+
+#### Content Information
+- Content type, content length
+- Accept headers (accept, accept-encoding, accept-language)
+
+#### Security Context
+- Origin header for CORS analysis
+
+#### Infrastructure Headers
+- Load balancer headers (`X-Forwarded-*`)
+- Proxy headers (`X-Real-IP`, `X-Client-IP`)
+
+### Instance Logger Middleware
+
+```go
+myLogger, _ := logger.NewLogger(logger.LoggerConfig{
+    RequestIDPrefix: "API-",
+    Development: true,
+})
+
+middleware := myLogger.LoggerMiddleware(true, true)
+http.ListenAndServe(":8080", middleware(mux))
 ```
 
 ## API Overview
@@ -87,7 +168,7 @@ type LoggerConfig struct {
 
 ### Global Logger Functions
 
-- `InitLogger(config LoggerConfig) error`
+- `InitGlobalLogger(config LoggerConfig) error`
 - `Flush()`
 - `Info(ctx, args...)`, `Debug`, `Warn`, `Error`, `Panic`, `Fatal`
 - `Infof(ctx, format, args...)`, ...
@@ -138,7 +219,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 
 ### Middleware
 
-- `LoggerMiddleware(next http.Handler) http.Handler`
+- `LoggerMiddleware(logRequestDetails bool, logCompleteTime bool) func(http.Handler) http.Handler`
 
 ## Example: Using Both Global and Instance Loggers
 
@@ -150,7 +231,7 @@ import (
 
 func main() {
     // Global logger
-    logger.InitLogger(logger.LoggerConfig{Development: true})
+    logger.InitGlobalLogger(logger.LoggerConfig{Development: true})
     defer logger.Flush()
     logger.Info(context.Background(), "Global logger in action")
 
@@ -161,6 +242,155 @@ func main() {
 }
 ```
 
+## Real-World Examples
+
+### Production API Server
+
+```go
+package main
+
+import (
+    "context"
+    "net/http"
+    "github.com/cyrus-wg/go-logger"
+)
+
+func main() {
+    // Initialize logger for production
+    logger.InitGlobalLogger(logger.LoggerConfig{
+        Development: false,  // Production mode
+        RequestIDPrefix: "PROD-",
+        FixedKeyValues: map[string]any{
+            "service": "user-api",
+            "version": "v1.0.0",
+        },
+    })
+    defer logger.Flush()
+
+    mux := http.NewServeMux()
+    
+    // API endpoint with context logging
+    mux.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+        ctx := r.Context()
+        
+        // Add user context
+        userID := r.Header.Get("X-User-ID")
+        if userID != "" {
+            ctx = logger.SetUser(ctx, userID)
+        }
+        
+        logger.Infow(ctx, "Processing user request", 
+            "endpoint", "/users",
+            "method", r.Method,
+        )
+        
+        // Your business logic here
+        w.WriteHeader(http.StatusOK)
+        w.Write([]byte(`{"users": []}`))
+        
+        logger.Infow(ctx, "Request processed successfully")
+    })
+
+    // Use full request logging in production for monitoring
+    middleware := logger.LoggerMiddleware(true, true)
+    
+    logger.Info(context.Background(), "Starting production server on :8080")
+    http.ListenAndServe(":8080", middleware(mux))
+}
+```
+
+### Development Server with Debug Logging
+
+```go
+func main() {
+    // Development configuration
+    logger.InitGlobalLogger(logger.LoggerConfig{
+        Development: true,  // Debug logs enabled
+        RequestIDPrefix: "DEV-",
+    })
+    defer logger.Flush()
+
+    mux := http.NewServeMux()
+    mux.HandleFunc("/debug", func(w http.ResponseWriter, r *http.Request) {
+        ctx := r.Context()
+        
+        // Debug logs only show in development
+        logger.Debug(ctx, "Debug: Processing request")
+        logger.Infow(ctx, "Request details", "path", r.URL.Path)
+        
+        w.Write([]byte("Debug response"))
+    })
+
+    // Full logging for development debugging
+    middleware := logger.LoggerMiddleware(true, true)
+    http.ListenAndServe(":3000", middleware(mux))
+}
+```
+
+### Multiple Service Instances
+
+```go
+func main() {
+    // Create separate loggers for different services
+    authLogger, _ := logger.NewLogger(logger.LoggerConfig{
+        RequestIDPrefix: "AUTH-",
+        FixedKeyValues: map[string]any{"service": "auth"},
+    })
+    
+    userLogger, _ := logger.NewLogger(logger.LoggerConfig{
+        RequestIDPrefix: "USER-",
+        FixedKeyValues: map[string]any{"service": "users"},
+    })
+
+    // Different middleware configurations
+    authMiddleware := authLogger.LoggerMiddleware(true, true)  // Full logging
+    userMiddleware := userLogger.LoggerMiddleware(false, true) // Latency only
+
+    // Setup routes with different loggers...
+}
+```
+
+## Sample Log Output
+
+### With Request Details (`logRequestDetails = true`)
+
+```json
+{
+  "level": "INFO",
+  "timestamp": "2024-09-28T10:30:45.123Z",
+  "message": "Incoming request",
+  "request_id": "PROD-550e8400-e29b-41d4-a716-446655440000",
+  "user_ip": "203.0.113.1",
+  "details": {
+    "method": "POST",
+    "url": "https://api.example.com/users?active=true",
+    "path": "/users",
+    "query_params": "active=true",
+    "protocol": "HTTP/1.1",
+    "host": "api.example.com",
+    "user_ip": "203.0.113.1",
+    "remote_addr": "10.0.0.1:54321",
+    "user_agent": "Mozilla/5.0 (compatible; APIClient/1.0)",
+    "content_type": "application/json",
+    "content_length": 156,
+    "origin": "https://app.example.com"
+  }
+}
+```
+
+### With Completion Logging (`logCompleteTime = true`)
+
+```json
+{
+  "level": "INFO", 
+  "timestamp": "2024-09-28T10:30:45.256Z",
+  "message": "Request completed",
+  "request_id": "PROD-550e8400-e29b-41d4-a716-446655440000",
+  "user_ip": "203.0.113.1",
+  "latency": "0.133"
+}
+```
+
 ## Examples
 
-See the `example/` directory for demos of API servers and more.
+See the `example/` directory for complete demos of API servers and more usage patterns.

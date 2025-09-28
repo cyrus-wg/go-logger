@@ -16,9 +16,9 @@ import (
 type contextKey string
 
 const (
-	requestIdKey contextKey = "requestId"
+	requestIdKey contextKey = "request_id"
 	userKey      contextKey = "user"
-	userIPKey    contextKey = "userIP"
+	userIPKey    contextKey = "user_ip"
 )
 
 const (
@@ -289,21 +289,63 @@ func (l *Logger) combineAttributes(ctx context.Context, keysAndValues ...any) []
 	return combined
 }
 
-func (l *Logger) LoggerMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		now := time.Now()
+func (l *Logger) LoggerMiddleware(logRequestDetails bool, logCompleteTime bool) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			now := time.Now()
 
-		requestId := l.GenerateRequestID()
-		r = r.WithContext(l.SetRequestID(r.Context(), requestId))
+			requestId := l.GenerateRequestID()
+			r = r.WithContext(l.SetRequestID(r.Context(), requestId))
 
-		userIP := getRealUserIP(r)
-		r = r.WithContext(l.SetUserIP(r.Context(), userIP))
+			userIP := getRealUserIP(r)
+			r = r.WithContext(l.SetUserIP(r.Context(), userIP))
 
-		next.ServeHTTP(w, r)
+			if logRequestDetails {
+				requestData := map[string]any{
+					// Basic request info
+					"method":       r.Method,
+					"url":          r.URL.String(),
+					"path":         r.URL.Path,
+					"query_params": r.URL.RawQuery,
+					"protocol":     r.Proto,
+					"host":         r.Host,
 
-		latency := time.Since(now)
-		l.Infow(r.Context(), "Request completed", "latency", latency)
-	})
+					// Client information
+					"user_ip":     userIP,
+					"remote_addr": r.RemoteAddr,
+					"user_agent":  r.Header.Get("User-Agent"),
+					"referer":     r.Header.Get("Referer"),
+
+					// Request size and content
+					"content_type":    r.Header.Get("Content-Type"),
+					"content_length":  r.ContentLength,
+					"accept":          r.Header.Get("Accept"),
+					"accept_encoding": r.Header.Get("Accept-Encoding"),
+					"accept_language": r.Header.Get("Accept-Language"),
+
+					// Security headers
+					"origin": r.Header.Get("Origin"),
+
+					// Load balancer / proxy headers
+					"x_forwarded_for":   r.Header.Get("X-Forwarded-For"),
+					"x_forwarded_proto": r.Header.Get("X-Forwarded-Proto"),
+					"x_forwarded_host":  r.Header.Get("X-Forwarded-Host"),
+					"x_real_ip":         r.Header.Get("X-Real-IP"),
+					"x_client_ip":       r.Header.Get("X-Client-IP"),
+				}
+
+				l.Infow(r.Context(), "Incoming request", "details", requestData)
+			}
+
+			next.ServeHTTP(w, r)
+
+			latency := time.Since(now)
+
+			if logCompleteTime {
+				l.Infow(r.Context(), "Request completed", "latency", latency)
+			}
+		})
+	}
 }
 
 func getRealUserIP(r *http.Request) string {
