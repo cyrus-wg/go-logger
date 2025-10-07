@@ -30,13 +30,11 @@ import (
     "github.com/cyrus-wg/go-logger"
 )
 
-```go
 func main() {
     logger.InitGlobalLogger(logger.LoggerConfig{Development: true})
     defer logger.Flush()
     logger.Info(context.Background(), "Hello from global logger!")
 }
-```
 ```
 
 ### Instance Logger (Advanced Usage)
