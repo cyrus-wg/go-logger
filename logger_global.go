@@ -160,14 +160,6 @@ func GetUser(ctx context.Context) (any, bool) {
 	return loggerInstance.GetUser(ctx)
 }
 
-func SetUserIP(ctx context.Context, userIP string) context.Context {
-	return loggerInstance.SetUserIP(ctx, userIP)
-}
-
-func GetUserIP(ctx context.Context) (string, bool) {
-	return loggerInstance.GetUserIP(ctx)
-}
-
 func GetExtraFields(ctx context.Context) (map[string]any, bool) {
 	return loggerInstance.GetExtraFields(ctx)
 }

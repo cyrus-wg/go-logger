@@ -184,7 +184,6 @@ type LoggerConfig struct {
 
 - `SetRequestID(ctx, id)`, `GetRequestID(ctx)`
 - `SetUser(ctx, user)`, `GetUser(ctx)`
-- `SetUserIP(ctx, ip)`, `GetUserIP(ctx)`
 - `GenerateRequestID()`
 
 ### Async Context Support
@@ -358,7 +357,6 @@ func main() {
   "timestamp": "2024-09-28T10:30:45.123Z",
   "message": "Incoming request",
   "request_id": "PROD-550e8400-e29b-41d4-a716-446655440000",
-  "user_ip": "203.0.113.1",
   "details": {
     "method": "POST",
     "url": "https://api.example.com/users?active=true",
@@ -384,7 +382,6 @@ func main() {
   "timestamp": "2024-09-28T10:30:45.256Z",
   "message": "Request completed",
   "request_id": "PROD-550e8400-e29b-41d4-a716-446655440000",
-  "user_ip": "203.0.113.1",
   "latency": "0.133"
 }
 ```

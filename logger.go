@@ -18,13 +18,11 @@ type contextKey string
 const (
 	requestIdKey contextKey = "request_id"
 	userKey      contextKey = "user"
-	userIPKey    contextKey = "user_ip"
 )
 
 const (
 	requestIdContextKey = string(requestIdKey)
 	userContextKey      = string(userKey)
-	userIPContextKey    = string(userIPKey)
 )
 
 type LoggerConfig struct {
@@ -203,15 +201,6 @@ func (l *Logger) GetUser(ctx context.Context) (any, bool) {
 	return user, user != nil
 }
 
-func (l *Logger) SetUserIP(ctx context.Context, userIP string) context.Context {
-	return context.WithValue(ctx, userIPKey, userIP)
-}
-
-func (l *Logger) GetUserIP(ctx context.Context) (string, bool) {
-	userIP, ok := ctx.Value(userIPKey).(string)
-	return userIP, ok
-}
-
 func (l *Logger) GetExtraFields(ctx context.Context) (map[string]any, bool) {
 	if len(l.extraFields) == 0 {
 		return nil, false
@@ -240,11 +229,6 @@ func (l *Logger) DetachContext(ctx context.Context) context.Context {
 	// Copy user
 	if user, ok := l.GetUser(ctx); ok {
 		newCtx = l.SetUser(newCtx, user)
-	}
-
-	// Copy user IP
-	if userIP, ok := l.GetUserIP(ctx); ok {
-		newCtx = l.SetUserIP(newCtx, userIP)
 	}
 
 	// Copy extra fields
@@ -276,9 +260,6 @@ func (l *Logger) combineAttributes(ctx context.Context, keysAndValues ...any) []
 	if user, ok := l.GetUser(ctx); ok {
 		combined = append(combined, userContextKey, user)
 	}
-	if userIP, ok := l.GetUserIP(ctx); ok {
-		combined = append(combined, userIPContextKey, userIP)
-	}
 	if extraFields, ok := l.GetExtraFields(ctx); ok {
 		for k, v := range extraFields {
 			combined = append(combined, k, v)
@@ -298,7 +279,6 @@ func (l *Logger) LoggerMiddleware(logRequestDetails bool, logCompleteTime bool) 
 			r = r.WithContext(l.SetRequestID(r.Context(), requestId))
 
 			userIP := getRealUserIP(r)
-			r = r.WithContext(l.SetUserIP(r.Context(), userIP))
 
 			if logRequestDetails {
 				requestData := map[string]any{
