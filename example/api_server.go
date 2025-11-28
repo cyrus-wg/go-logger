@@ -66,11 +66,30 @@ func RunGlobalLoggerDemo() {
 		w.Write([]byte("Index endpoint"))
 	})
 
+	healthHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Health check - logging is skipped by middleware but manual logging still works
+		logger.Info(r.Context(), "Health check called (manual log)")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status": "healthy"}`))
+	})
+
+	metricsHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Metrics endpoint - logging is skipped by middleware
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"requests": 100, "errors": 0}`))
+	})
+
 	mux.Handle("/", indexHandler)
+	mux.Handle("/health", healthHandler)
+	mux.Handle("/metrics", metricsHandler)
 
 	port := 8080
-	logger.Infof(ctx, "Starting Development Mode Demo on :%d", port)
-	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), logger.LoggerMiddleware(true, true)(mux)); err != nil {
+	logger.Infof(ctx, "Starting Global Logger Demo on :%d", port)
+	logger.Info(ctx, "Endpoints: / (logged), /health (skipped), /metrics (skipped)")
+
+	// Use middleware with skip paths for health and metrics endpoints
+	middleware := logger.LoggerMiddleware(true, true, "/health", "/metrics")
+	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), middleware(mux)); err != nil {
 		logger.Fatal(ctx, "Server failed to start:", err)
 	}
 }
@@ -103,11 +122,29 @@ func RunInstanceLoggerDemo() {
 		w.Write([]byte("Index endpoint"))
 	})
 
+	healthHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Health check - logging is skipped by middleware
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status": "healthy"}`))
+	})
+
+	readyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Readiness check - logging is skipped by middleware
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"ready": true}`))
+	})
+
 	mux.Handle("/", indexHandler)
+	mux.Handle("/health", healthHandler)
+	mux.Handle("/ready", readyHandler)
 
 	port := 8080
 	loggerInstance.Infof(ctx, "Starting Instance Logger Demo on :%d", port)
-	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), loggerInstance.LoggerMiddleware(true, true)(mux)); err != nil {
+	loggerInstance.Info(ctx, "Endpoints: / (logged), /health (skipped), /ready (skipped)")
+
+	// Use middleware with skip paths for health and readiness endpoints
+	middleware := loggerInstance.LoggerMiddleware(true, true, "/health", "/ready")
+	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), middleware(mux)); err != nil {
 		loggerInstance.Fatal(ctx, "Server failed to start:", err)
 	}
 }

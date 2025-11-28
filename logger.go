@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -241,13 +242,6 @@ func (l *Logger) DetachContext(ctx context.Context) context.Context {
 	return newCtx
 }
 
-// WithTimeout creates a detached context with timeout that preserves logging values.
-// Use this for async operations that need both timeout and logging context.
-func (l *Logger) WithTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
-	detachedCtx := l.DetachContext(ctx)
-	return context.WithTimeout(detachedCtx, timeout)
-}
-
 func (l *Logger) combineAttributes(ctx context.Context, keysAndValues ...any) []any {
 	var combined []any
 
@@ -270,17 +264,17 @@ func (l *Logger) combineAttributes(ctx context.Context, keysAndValues ...any) []
 	return combined
 }
 
-func (l *Logger) LoggerMiddleware(logRequestDetails bool, logCompleteTime bool) func(next http.Handler) http.Handler {
+func (l *Logger) LoggerMiddleware(logRequestDetails bool, logCompleteTime bool, skipPaths ...string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			now := time.Now()
+			startTime := time.Now()
 
 			requestId := l.GenerateRequestID()
 			r = r.WithContext(l.SetRequestID(r.Context(), requestId))
 
-			userIP := getRealUserIP(r)
+			shouldSkipLogging := slices.Contains(skipPaths, r.URL.Path)
 
-			if logRequestDetails {
+			if logRequestDetails && !shouldSkipLogging {
 				requestData := map[string]any{
 					// Basic request info
 					"method":       r.Method,
@@ -291,7 +285,7 @@ func (l *Logger) LoggerMiddleware(logRequestDetails bool, logCompleteTime bool) 
 					"host":         r.Host,
 
 					// Client information
-					"user_ip":     userIP,
+					"user_ip":     getRealUserIP(r),
 					"remote_addr": r.RemoteAddr,
 					"user_agent":  r.Header.Get("User-Agent"),
 					"referer":     r.Header.Get("Referer"),
@@ -319,9 +313,9 @@ func (l *Logger) LoggerMiddleware(logRequestDetails bool, logCompleteTime bool) 
 
 			next.ServeHTTP(w, r)
 
-			latency := time.Since(now)
+			latency := time.Since(startTime)
 
-			if logCompleteTime {
+			if logCompleteTime && !shouldSkipLogging {
 				l.Infow(r.Context(), "Request completed", "latency", latency)
 			}
 		})

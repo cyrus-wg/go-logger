@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 )
 
 var loggerInstance *Logger
@@ -168,10 +167,6 @@ func DetachContext(ctx context.Context) context.Context {
 	return loggerInstance.DetachContext(ctx)
 }
 
-func WithTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
-	return loggerInstance.WithTimeout(ctx, timeout)
-}
-
-func LoggerMiddleware(logRequestDetails bool, logCompleteTime bool) func(next http.Handler) http.Handler {
-	return loggerInstance.LoggerMiddleware(logRequestDetails, logCompleteTime)
+func LoggerMiddleware(logRequestDetails bool, logCompleteTime bool, skipPaths ...string) func(next http.Handler) http.Handler {
+	return loggerInstance.LoggerMiddleware(logRequestDetails, logCompleteTime, skipPaths...)
 }

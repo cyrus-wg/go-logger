@@ -90,13 +90,14 @@ http.ListenAndServe(":8080", middleware(mux))
 
 ### Middleware Configuration Options
 
-The `LoggerMiddleware` function accepts two boolean parameters:
+The `LoggerMiddleware` function accepts the following parameters:
 
 - **`logRequestDetails bool`**: Logs comprehensive request information
 - **`logCompleteTime bool`**: Logs request completion with latency
+- **`skipPaths ...string`**: Variadic paths to skip logging (e.g., health checks)
 
 ```go
-func LoggerMiddleware(logRequestDetails bool, logCompleteTime bool) func(http.Handler) http.Handler
+func LoggerMiddleware(logRequestDetails bool, logCompleteTime bool, skipPaths ...string) func(http.Handler) http.Handler
 ```
 
 #### Configuration Examples
@@ -113,7 +114,26 @@ logger.LoggerMiddleware(true, false)
 
 // Option 4: No automatic logging (manual logging only)
 logger.LoggerMiddleware(false, false)
+
+// Option 5: Full logging but skip endpoints (metrics, health, favicon)
+logger.LoggerMiddleware(true, true, "/health", "/metrics", "/favicon.ico")
 ```
+
+### Skipping Paths
+
+Use the `skipPaths` parameter to exclude specific paths from request logging. This is useful for:
+
+- **Health check endpoints** that are called frequently by load balancers
+- **Metrics endpoints** that generate excessive log noise
+- **Static assets** like favicon.ico
+
+```go
+// Skip health checks and metrics - these won't generate logs
+middleware := logger.LoggerMiddleware(true, true, "/health", "/healthz", "/metrics")
+http.ListenAndServe(":8080", middleware(mux))
+```
+
+**Note:** Skipped paths still get a request ID assigned to the context, so manual logging within those handlers will still include the request ID.
 
 ### What Gets Logged
 
@@ -216,7 +236,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 
 ### Middleware
 
-- `LoggerMiddleware(logRequestDetails bool, logCompleteTime bool) func(http.Handler) http.Handler`
+- `LoggerMiddleware(logRequestDetails bool, logCompleteTime bool, skipPaths ...string) func(http.Handler) http.Handler`
 
 ## Example: Using Both Global and Instance Loggers
 
@@ -287,9 +307,21 @@ func main() {
         
         logger.Infow(ctx, "Request processed successfully")
     })
+    
+    // Health check endpoint (logging will be skipped)
+    mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+        w.WriteHeader(http.StatusOK)
+        w.Write([]byte(`{"status": "healthy"}`))
+    })
+    
+    // Metrics endpoint (logging will be skipped)
+    mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
+        w.WriteHeader(http.StatusOK)
+        w.Write([]byte(`{"requests": 1000}`))
+    })
 
-    // Use full request logging in production for monitoring
-    middleware := logger.LoggerMiddleware(true, true)
+    // Use full request logging in production, skip health and metrics endpoints
+    middleware := logger.LoggerMiddleware(true, true, "/health", "/metrics")
     
     logger.Info(context.Background(), "Starting production server on :8080")
     http.ListenAndServe(":8080", middleware(mux))
