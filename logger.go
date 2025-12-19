@@ -56,7 +56,7 @@ func NewLogger(config LoggerConfig) (*Logger, error) {
 
 	loggerConfig.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
 	loggerConfig.EncoderConfig.MessageKey = "message"
-	loggerConfig.EncoderConfig.TimeKey = "timestamp"
+	loggerConfig.EncoderConfig.TimeKey = "@timestamp"
 	loggerConfig.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 
 	zLogger, err := loggerConfig.Build(

@@ -386,7 +386,7 @@ func main() {
 ```json
 {
   "level": "INFO",
-  "timestamp": "2024-09-28T10:30:45.123Z",
+  "@timestamp": "2024-09-28T10:30:45.123Z",
   "message": "Incoming request",
   "request_id": "PROD-550e8400-e29b-41d4-a716-446655440000",
   "details": {
@@ -411,7 +411,7 @@ func main() {
 ```json
 {
   "level": "INFO", 
-  "timestamp": "2024-09-28T10:30:45.256Z",
+  "@timestamp": "2024-09-28T10:30:45.256Z",
   "message": "Request completed",
   "request_id": "PROD-550e8400-e29b-41d4-a716-446655440000",
   "latency": "0.133"

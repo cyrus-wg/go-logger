@@ -13,7 +13,7 @@ import (
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: go run . <demo_name>")
-		fmt.Println("Available demos: dev, prod")
+		fmt.Println("Available demos: global, instance")
 		return
 	}
 
