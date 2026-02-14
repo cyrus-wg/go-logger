@@ -54,7 +54,7 @@ func main() {
 
 ## HTTP Middleware
 
-The logger provides configurable HTTP middleware for automatic request logging and tracing.
+The logger provides configurable HTTP middleware for automatic request logging and tracing with powerful path matching capabilities.
 
 ### Basic Middleware Usage
 
@@ -94,13 +94,44 @@ The `LoggerMiddleware` function accepts the following parameters:
 
 - **`logRequestDetails bool`**: Logs comprehensive request information
 - **`logCompleteTime bool`**: Logs request completion with latency
-- **`skipPaths ...string`**: Variadic paths to skip logging (e.g., health checks)
+- **`bypassList ...BypassRequestLogging`**: Patterns to skip logging
 
 ```go
-func LoggerMiddleware(logRequestDetails bool, logCompleteTime bool, skipPaths ...string) func(http.Handler) http.Handler
+func LoggerMiddleware(logRequestDetails bool, logCompleteTime bool, bypassList ...BypassRequestLogging) func(http.Handler) http.Handler
 ```
 
-#### Configuration Examples
+### BypassRequestLogging Structure
+
+```go
+type BypassRequestLogging struct {
+    Path    string  // Ant-style pattern or regex
+    Methods string  // Comma-separated methods (e.g., "GET,POST"), empty means all methods
+    IsRegex bool    // If true, Path is treated as regex; otherwise Ant-style pattern
+}
+```
+
+### Path Pattern Matching
+
+The middleware supports two pattern matching styles:
+
+#### Ant-Style Patterns (Default)
+
+| Pattern | Matches | Description |
+|---------|---------|-------------|
+| `/health` | `/health` | Exact match |
+| `/api/*` | `/api/users`, `/api/orders` | Single segment wildcard |
+| `/api/**` | `/api/users/123/orders` | Multi-segment wildcard |
+| `/api/user?` | `/api/user1`, `/api/userA` | Single character wildcard |
+| `/api/*/profile` | `/api/john/profile` | Wildcard in middle |
+
+#### Regex Patterns (Set `IsRegex: true`)
+
+| Pattern | Matches | Description |
+|---------|---------|-------------|
+| `/api/v[0-9]+/.*` | `/api/v1/users`, `/api/v2/orders` | Version pattern |
+| `/users/[0-9]+` | `/users/123`, `/users/456` | Numeric ID |
+
+### Configuration Examples
 
 ```go
 // Option 1: Minimal logging (latency only)
@@ -115,21 +146,49 @@ logger.LoggerMiddleware(true, false)
 // Option 4: No automatic logging (manual logging only)
 logger.LoggerMiddleware(false, false)
 
-// Option 5: Full logging but skip endpoints (metrics, health, favicon)
-logger.LoggerMiddleware(true, true, "/health", "/metrics", "/favicon.ico")
+// Option 5: Skip specific endpoints (exact match)
+logger.LoggerMiddleware(true, true,
+    logger.BypassRequestLogging{Path: "/health"},
+    logger.BypassRequestLogging{Path: "/metrics"},
+)
+
+// Option 6: Skip with method filtering
+logger.LoggerMiddleware(true, true,
+    logger.BypassRequestLogging{Path: "/health", Methods: "GET"},
+    logger.BypassRequestLogging{Path: "/api/internal/**", Methods: "GET,POST"},
+)
+
+// Option 7: Skip with Ant-style wildcards
+logger.LoggerMiddleware(true, true,
+    logger.BypassRequestLogging{Path: "/api/v1/**"},           // All v1 API paths
+    logger.BypassRequestLogging{Path: "/static/*"},            // Static files
+    logger.BypassRequestLogging{Path: "/users/*/avatar"},      // User avatars
+)
+
+// Option 8: Skip with regex patterns
+logger.LoggerMiddleware(true, true,
+    logger.BypassRequestLogging{Path: "/api/v[0-9]+/health", IsRegex: true},
+    logger.BypassRequestLogging{Path: "/users/[0-9]+/avatar", IsRegex: true},
+)
 ```
 
-### Skipping Paths
+### Bypassing Paths
 
-Use the `skipPaths` parameter to exclude specific paths from request logging. This is useful for:
+Use `BypassRequestLogging` to exclude specific paths from request logging. This is useful for:
 
 - **Health check endpoints** that are called frequently by load balancers
 - **Metrics endpoints** that generate excessive log noise
 - **Static assets** like favicon.ico
+- **Internal APIs** that don't need logging
 
 ```go
-// Skip health checks and metrics - these won't generate logs
-middleware := logger.LoggerMiddleware(true, true, "/health", "/healthz", "/metrics")
+// Skip health checks and metrics using Ant-style patterns
+middleware := logger.LoggerMiddleware(true, true,
+    logger.BypassRequestLogging{Path: "/health"},
+    logger.BypassRequestLogging{Path: "/healthz"},
+    logger.BypassRequestLogging{Path: "/metrics"},
+    logger.BypassRequestLogging{Path: "/internal/**"},  // All internal paths
+)
 http.ListenAndServe(":8080", middleware(mux))
 ```
 
@@ -236,7 +295,17 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 
 ### Middleware
 
-- `LoggerMiddleware(logRequestDetails bool, logCompleteTime bool, skipPaths ...string) func(http.Handler) http.Handler`
+- `LoggerMiddleware(logRequestDetails bool, logCompleteTime bool, bypassList ...BypassRequestLogging) func(http.Handler) http.Handler`
+
+### BypassRequestLogging
+
+```go
+type BypassRequestLogging struct {
+    Path    string  // Ant-style pattern (*, **, ?) or regex
+    Methods string  // Comma-separated: "GET,POST" (empty = all)
+    IsRegex bool    // Use regex instead of Ant-style
+}
+```
 
 ## Example: Using Both Global and Instance Loggers
 
@@ -321,7 +390,10 @@ func main() {
     })
 
     // Use full request logging in production, skip health and metrics endpoints
-    middleware := logger.LoggerMiddleware(true, true, "/health", "/metrics")
+    middleware := logger.LoggerMiddleware(true, true,
+        logger.BypassRequestLogging{Path: "/health"},
+        logger.BypassRequestLogging{Path: "/metrics"},
+    )
     
     logger.Info(context.Background(), "Starting production server on :8080")
     http.ListenAndServe(":8080", middleware(mux))

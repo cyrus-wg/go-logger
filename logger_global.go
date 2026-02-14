@@ -163,10 +163,6 @@ func GetExtraFields(ctx context.Context) (map[string]any, bool) {
 	return loggerInstance.GetExtraFields(ctx)
 }
 
-func DetachContext(ctx context.Context) context.Context {
-	return loggerInstance.DetachContext(ctx)
-}
-
-func LoggerMiddleware(logRequestDetails bool, logCompleteTime bool, skipPaths ...string) func(next http.Handler) http.Handler {
-	return loggerInstance.LoggerMiddleware(logRequestDetails, logCompleteTime, skipPaths...)
+func LoggerMiddleware(logRequestDetails bool, logCompleteTime bool, bypassList ...BypassRequestLogging) func(next http.Handler) http.Handler {
+	return loggerInstance.LoggerMiddleware(logRequestDetails, logCompleteTime, bypassList...)
 }

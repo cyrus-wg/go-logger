@@ -88,7 +88,7 @@ func RunGlobalLoggerDemo() {
 	logger.Info(ctx, "Endpoints: / (logged), /health (skipped), /metrics (skipped)")
 
 	// Use middleware with skip paths for health and metrics endpoints
-	middleware := logger.LoggerMiddleware(true, true, "/health", "/metrics")
+	middleware := logger.LoggerMiddleware(true, true, logger.BypassRequestLogging{Path: "/health", Methods: "GET"}, logger.BypassRequestLogging{Path: "/metrics", Methods: "GET"})
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), middleware(mux)); err != nil {
 		logger.Fatal(ctx, "Server failed to start:", err)
 	}
@@ -143,7 +143,7 @@ func RunInstanceLoggerDemo() {
 	loggerInstance.Info(ctx, "Endpoints: / (logged), /health (skipped), /ready (skipped)")
 
 	// Use middleware with skip paths for health and readiness endpoints
-	middleware := loggerInstance.LoggerMiddleware(true, true, "/health", "/ready")
+	middleware := loggerInstance.LoggerMiddleware(true, true, logger.BypassRequestLogging{Path: "/health", Methods: "GET"}, logger.BypassRequestLogging{Path: "/ready", Methods: "GET"})
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), middleware(mux)); err != nil {
 		loggerInstance.Fatal(ctx, "Server failed to start:", err)
 	}
